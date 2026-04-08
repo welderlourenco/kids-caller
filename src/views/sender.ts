@@ -3,6 +3,35 @@ import { supabase } from '../supabase'
 
 const MAX_DIGITS = 4
 
+// ---------------------------------------------------------------------------
+// Wake Lock
+// ---------------------------------------------------------------------------
+
+let wakeLock: WakeLockSentinel | null = null
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return
+  try {
+    wakeLock = await navigator.wakeLock.request('screen')
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null
+    })
+  } catch {
+    /* device may not support it */
+  }
+}
+
+function releaseWakeLock() {
+  wakeLock?.release()
+  wakeLock = null
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && !wakeLock) {
+    requestWakeLock()
+  }
+}
+
 export function renderSender(app: HTMLDivElement) {
   let display = ''
   let sending = false
@@ -107,4 +136,19 @@ export function renderSender(app: HTMLDivElement) {
       }, 1000)
     }
   })
+
+  // --- Wake Lock ---
+
+  requestWakeLock()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
+  // --- Cleanup on navigation ---
+
+  function cleanup() {
+    releaseWakeLock()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('hashchange', cleanup)
+  }
+
+  window.addEventListener('hashchange', cleanup)
 }

@@ -10,3 +10,7 @@ registerRoute('/sender', renderSender)
 registerRoute('/receiver', renderReceiver)
 
 initRouter(document.querySelector<HTMLDivElement>('#app')!)
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+}
