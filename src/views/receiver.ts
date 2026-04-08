@@ -6,6 +6,7 @@ interface Chamado {
   child_number: string
   created_at: string
   read: boolean
+  acknowledged: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -180,11 +181,27 @@ export function renderReceiver(app: HTMLDivElement) {
   }
 
   function renderCard(c: Chamado): string {
-    return `<button class="recv__card${c.read ? '' : ' recv__card--unread'}" data-id="${c.id}">
-      <span class="recv__card-number">#${c.child_number}</span>
-      <span class="recv__card-time">${formatTime(c.created_at)}</span>
-      ${c.read ? '' : '<span class="recv__card-novo">Novo</span>'}
-    </button>`
+    const cardClass = c.acknowledged
+      ? 'recv__card recv__card--acknowledged'
+      : c.read
+        ? 'recv__card'
+        : 'recv__card recv__card--unread'
+
+    let action = ''
+    if (c.acknowledged) {
+      action = '<div class="recv__card-row"><span class="recv__card-confirmed">Confirmado ✓</span></div>'
+    } else if (!c.read) {
+      action = `<div class="recv__card-row"><button class="recv__card-ack" data-ack="${c.id}">✓ Confirmar</button></div>`
+    }
+
+    return `<div class="${cardClass}" data-id="${c.id}">
+      <div class="recv__card-top">
+        <span class="recv__card-number">#${c.child_number}</span>
+        <span class="recv__card-time">${formatTime(c.created_at)}</span>
+        ${!c.read && !c.acknowledged ? '<span class="recv__card-novo">Novo</span>' : ''}
+      </div>
+      ${action}
+    </div>`
   }
 
   function renderList() {
@@ -202,12 +219,13 @@ export function renderReceiver(app: HTMLDivElement) {
     renderList()
     playAlertSound()
     sendNotification(row.child_number)
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200])
   }
 
   // --- Mark as read ---
 
   listEl.addEventListener('click', async (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-id]')
+    const card = (e.target as HTMLElement).closest<HTMLDivElement>('[data-id]')
     if (!card) return
     const id = Number(card.dataset.id)
     const chamado = chamados.find((c) => c.id === id)
@@ -216,6 +234,22 @@ export function renderReceiver(app: HTMLDivElement) {
     chamado.read = true
     renderList()
     await supabase.from('chamados').update({ read: true }).eq('id', id)
+  })
+
+  // --- Acknowledge ---
+
+  listEl.addEventListener('click', async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-ack]')
+    if (!btn) return
+    e.stopPropagation()
+    const id = Number(btn.dataset.ack)
+    const chamado = chamados.find((c) => c.id === id)
+    if (!chamado || chamado.acknowledged) return
+
+    chamado.acknowledged = true
+    chamado.read = true
+    renderList()
+    await supabase.from('chamados').update({ acknowledged: true, read: true }).eq('id', id)
   })
 
   // --- Clear all ---

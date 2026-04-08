@@ -4,6 +4,29 @@ import { supabase } from '../supabase'
 const MAX_DIGITS = 4
 
 // ---------------------------------------------------------------------------
+// Confirmation sound (short high-pitch beep)
+// ---------------------------------------------------------------------------
+
+let audioCtx: AudioContext | null = null
+
+function playConfirmSound() {
+  if (!audioCtx) audioCtx = new AudioContext()
+  const ctx = audioCtx
+
+  const now = ctx.currentTime
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0.2, now)
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+  gain.connect(ctx.destination)
+
+  const osc = ctx.createOscillator()
+  osc.frequency.value = 880
+  osc.connect(gain)
+  osc.start(now)
+  osc.stop(now + 0.15)
+}
+
+// ---------------------------------------------------------------------------
 // Wake Lock
 // ---------------------------------------------------------------------------
 
@@ -35,6 +58,7 @@ function onVisibilityChange() {
 export function renderSender(app: HTMLDivElement) {
   let display = ''
   let sending = false
+  const pendingIds = new Set<number>()
 
   app.innerHTML = `
     <div class="pin-view">
@@ -47,6 +71,7 @@ export function renderSender(app: HTMLDivElement) {
       </button>
 
       <div class="pin-view__body">
+        <div class="pin-toast" data-toast hidden></div>
         <div class="pin-display" data-display>---</div>
 
         <div class="pin-grid">
@@ -79,6 +104,7 @@ export function renderSender(app: HTMLDivElement) {
 
   const displayEl = app.querySelector<HTMLDivElement>('[data-display]')!
   const sendBtn = app.querySelector<HTMLButtonElement>('[data-send]')!
+  const toastEl = app.querySelector<HTMLDivElement>('[data-toast]')!
 
   function updateDisplay() {
     displayEl.textContent = display || '---'
@@ -113,11 +139,13 @@ export function renderSender(app: HTMLDivElement) {
 
     const value = display
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('chamados')
       .insert({ child_number: value })
+      .select('id')
+      .single()
 
-    if (error) {
+    if (error || !data) {
       displayEl.textContent = 'Erro!'
       displayEl.classList.add('pin-display--error')
       setTimeout(() => {
@@ -126,6 +154,7 @@ export function renderSender(app: HTMLDivElement) {
         updateDisplay()
       }, 1500)
     } else {
+      pendingIds.add(data.id)
       displayEl.textContent = '✓'
       displayEl.classList.add('pin-display--success')
       setTimeout(() => {
@@ -137,6 +166,42 @@ export function renderSender(app: HTMLDivElement) {
     }
   })
 
+  // --- Toast helper ---
+
+  let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+  function showToast(message: string) {
+    toastEl.textContent = message
+    toastEl.hidden = false
+    toastEl.classList.add('pin-toast--visible')
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => {
+      toastEl.classList.remove('pin-toast--visible')
+      toastTimer = setTimeout(() => {
+        toastEl.hidden = true
+        toastTimer = null
+      }, 300)
+    }, 3000)
+  }
+
+  // --- Realtime subscription for acknowledgements ---
+
+  const ackChannel = supabase
+    .channel('chamados-acks')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chamados' },
+      (payload) => {
+        const row = payload.new as { id: number; child_number: string; acknowledged: boolean }
+        if (row.acknowledged && pendingIds.has(row.id)) {
+          pendingIds.delete(row.id)
+          playConfirmSound()
+          showToast(`Chamado #${row.child_number} recebido! ✓`)
+        }
+      },
+    )
+    .subscribe()
+
   // --- Wake Lock ---
 
   requestWakeLock()
@@ -145,6 +210,7 @@ export function renderSender(app: HTMLDivElement) {
   // --- Cleanup on navigation ---
 
   function cleanup() {
+    supabase.removeChannel(ackChannel)
     releaseWakeLock()
     document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('hashchange', cleanup)

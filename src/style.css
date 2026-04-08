@@ -722,8 +722,8 @@ button {
 
 .recv__card {
   display: flex;
-  align-items: center;
-  gap: var(--space-md);
+  flex-direction: column;
+  gap: var(--space-sm);
   width: 100%;
   padding: var(--space-md) var(--space-lg);
   background: var(--color-surface);
@@ -734,6 +734,17 @@ button {
   transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.recv__card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.recv__card-row {
+  width: 100%;
 }
 
 .recv__card:hover {
@@ -795,4 +806,89 @@ button {
   .recv__card-number {
     font-size: 3rem;
   }
+}
+
+/* --- Card: Acknowledged state --- */
+
+.recv__card--acknowledged {
+  border-left-color: var(--color-secondary);
+}
+
+/* --- Confirm button inside card --- */
+
+.recv__card-ack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-secondary);
+  color: #fff;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+}
+
+.recv__card-ack:hover {
+  background: var(--color-secondary-hover);
+}
+
+.recv__card-ack:active {
+  transform: scale(0.93);
+}
+
+/* --- Confirmed badge --- */
+
+.recv__card-confirmed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-secondary-light);
+  color: var(--color-secondary);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   Sender Toast
+   ============================================ */
+
+.pin-toast {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+  background: var(--color-secondary);
+  color: #fff;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 300ms ease, opacity 300ms ease;
+  z-index: 20;
+  box-shadow: 0 4px 12px var(--color-shadow);
+}
+
+.pin-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(var(--space-md));
+  pointer-events: auto;
+}
+
+.pin-view__body {
+  position: relative;
 }
